@@ -20,7 +20,7 @@ from enum import Enum
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 
-from .analytics import ProphetBrain
+from .app.analytics import ProphetBrain
 
 try:
     from anthropic import Anthropic

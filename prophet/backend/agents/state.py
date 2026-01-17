@@ -1,4 +1,4 @@
-from typing import TypedDict, Optional, List, Dict, Any
+from typing_extensions import TypedDict, Optional, List, Dict, Any
 
 class TrendOpportunity(TypedDict):
     event: str

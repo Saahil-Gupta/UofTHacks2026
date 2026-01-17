@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Dict
+from typing_extensions import List, Dict
 import asyncio
 from .agents.oracle import OracleAgent
 from .graph import app_graph

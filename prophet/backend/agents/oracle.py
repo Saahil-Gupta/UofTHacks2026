@@ -1,6 +1,6 @@
 import httpx
 import random
-from typing import List, Dict, Any
+from typing_extensions import List, Dict, Any
 from .state import TrendOpportunity
 
 class OracleAgent:

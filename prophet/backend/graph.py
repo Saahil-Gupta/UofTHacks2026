@@ -1,5 +1,5 @@
 from langgraph.graph import StateGraph, END
-from typing import TypedDict, Annotated
+from typing_extensions import TypedDict, Annotated
 import operator
 from .agents.state import TrendOpportunity
 from .agents.oracle import OracleAgent
