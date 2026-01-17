@@ -120,7 +120,8 @@ def node_images(state: GraphState) -> Dict[str, Any]:
     image_model = os.getenv("OR_IMAGE_MODEL", "black-forest-labs/flux.2-klein-4b")
 
     # same dir as app.py uses
-    out_dir = Path(__file__).with_name("generated")
+    out_dir = Path(__file__).resolve().parents[1] / "generated"  # project-root/generated
+    out_dir.mkdir(exist_ok=True)
 
     updated: List[FinalProduct] = []
     for p in state.final_products:
