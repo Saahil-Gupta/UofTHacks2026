@@ -1,0 +1,5 @@
+.env*
+services/.env
+/services/node_modules
+/node_modules       
+/services/venv/Lib
