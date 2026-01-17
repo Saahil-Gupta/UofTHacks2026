@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -70,11 +70,56 @@ function pct(n: number | undefined) {
   return `${Math.round(n * 100)}%`;
 }
 
+// --------------------
+// Cache (localStorage)
+// --------------------
+const CACHE_KEY = "prophet:runs:v1";
+
+type RunCache = Record<string, GraphResponse>;
+
+function loadCache(): RunCache {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem(CACHE_KEY) || "{}") as RunCache;
+  } catch {
+    return {};
+  }
+}
+
+function saveCache(cache: RunCache) {
+  localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+}
+
 export default function Home() {
   const [marketId, setMarketId] = useState(SAMPLE_MARKETS[0].id);
   const [running, setRunning] = useState(false);
   const [resp, setResp] = useState<GraphResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // cache state (for quick switching and persistence)
+  const [cache, setCache] = useState<RunCache>({});
+
+  // Load cache on mount and hydrate current market if present
+  useEffect(() => {
+    const c = loadCache();
+    setCache(c);
+    if (c[marketId]) setResp(c[marketId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When market changes, swap to cached run if available
+  useEffect(() => {
+    const c = loadCache();
+    setCache(c);
+    if (c[marketId]) {
+      setResp(c[marketId]);
+      setError(null);
+    } else {
+      // keep previous resp visible or clear it
+      // choose one behavior:
+      setResp(null);
+    }
+  }, [marketId]);
 
   const state = resp?.state;
 
@@ -84,6 +129,36 @@ export default function Home() {
     if (vals.length === 0) return undefined;
     return Math.max(...vals);
   }, [state?.market?.market_values]);
+
+  // --------------------
+  // Status computation
+  // --------------------
+  const status = useMemo(() => {
+    if (!state) return "idle" as const;
+    if (state.prefilter_passed === false) return "prefilter_fail" as const;
+    if (state.oracle?.shoppable === false) return "not_shoppable" as const;
+    if (state.oracle?.shoppable === true) return "shoppable" as const;
+    return "ran" as const;
+  }, [state]);
+
+  const marketCardClass = useMemo(() => {
+    // subtle shaded look for left market card
+    if (status === "not_shoppable") return "border-red-500/30 bg-red-500/5";
+    if (status === "shoppable") return "border-emerald-500/30 bg-emerald-500/5";
+    if (status === "prefilter_fail") return "border-yellow-500/30 bg-yellow-500/5";
+    return "";
+  }, [status]);
+
+  const prefilterBadgeVariant = useMemo(() => {
+    // using only shadcn variants you already have
+    if (!state) return "secondary" as const;
+    return state.prefilter_passed ? ("default" as const) : ("secondary" as const);
+  }, [state]);
+
+  const oracleBadgeVariant = useMemo(() => {
+    if (!state?.oracle) return "secondary" as const;
+    return state.oracle.shoppable ? ("default" as const) : ("secondary" as const);
+  }, [state]);
 
   async function runOnce() {
     setRunning(true);
@@ -98,13 +173,31 @@ export default function Home() {
         throw new Error(t || `HTTP ${r.status}`);
       }
       const data = (await r.json()) as GraphResponse;
+
+      // set UI state
       setResp(data);
+
+      // persist to cache
+      const next = { ...loadCache(), [marketId]: data };
+      saveCache(next);
+      setCache(next);
     } catch (e: any) {
       setError(e?.message ?? "Unknown error");
     } finally {
       setRunning(false);
     }
   }
+
+  function clearCache() {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(CACHE_KEY);
+    }
+    setCache({});
+    setResp(null);
+    setError(null);
+  }
+
+  const hasCached = !!cache[marketId];
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -116,9 +209,7 @@ export default function Home() {
             </div>
             <div>
               <h1 className="text-xl font-semibold leading-tight">Prophet</h1>
-              <p className="text-sm text-muted-foreground">
-                Event-driven commerce engine
-              </p>
+              <p className="text-sm text-muted-foreground">Event-driven commerce engine</p>
             </div>
           </div>
 
@@ -128,7 +219,7 @@ export default function Home() {
               <select
                 value={marketId}
                 onChange={(e) => setMarketId(e.target.value)}
-                className="bg-transparent text-sm outline-none"
+                className="bg-background text-sm outline-none"
               >
                 {SAMPLE_MARKETS.map((m) => (
                   <option key={m.id} value={m.id}>
@@ -136,22 +227,31 @@ export default function Home() {
                   </option>
                 ))}
               </select>
+
+              {/* tiny cached indicator */}
+              <span className="ml-2 text-[11px] text-muted-foreground">
+                {hasCached ? "cached" : "not run"}
+              </span>
             </div>
 
             <Button onClick={runOnce} disabled={running} className="gap-2">
               {running ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
               Run
             </Button>
+
+            <Button onClick={clearCache} variant="secondary" disabled={running} className="gap-2">
+              Clear
+            </Button>
           </div>
         </header>
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <Card className="lg:col-span-1">
+          <Card className={`lg:col-span-1 ${marketCardClass}`}>
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 Market
                 {state ? (
-                  <Badge variant={state.prefilter_passed ? "default" : "secondary"}>
+                  <Badge variant={prefilterBadgeVariant}>
                     prefilter {state.prefilter_passed ? "pass" : "stop"}
                   </Badge>
                 ) : (
@@ -162,7 +262,9 @@ export default function Home() {
             <CardContent className="space-y-3">
               {!state ? (
                 <p className="text-sm text-muted-foreground">
-                  Click Run to execute the graph for the selected market.
+                  {hasCached
+                    ? "Loaded from cache. Click Run to refresh."
+                    : "Click Run to execute the graph for the selected market."}
                 </p>
               ) : (
                 <>
@@ -189,7 +291,7 @@ export default function Home() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Oracle</span>
                       {state.oracle ? (
-                        <Badge variant={state.oracle.shoppable ? "default" : "secondary"}>
+                        <Badge variant={oracleBadgeVariant}>
                           {state.oracle.shoppable ? "shoppable" : "not shoppable"}
                         </Badge>
                       ) : (
@@ -212,9 +314,7 @@ export default function Home() {
               {error && (
                 <div className="rounded-xl border border-destructive/40 bg-destructive/10 p-3">
                   <p className="text-sm font-medium text-destructive">Error</p>
-                  <pre className="mt-1 whitespace-pre-wrap text-xs text-destructive/90">
-                    {error}
-                  </pre>
+                  <pre className="mt-1 whitespace-pre-wrap text-xs text-destructive/90">{error}</pre>
                 </div>
               )}
             </CardContent>
@@ -240,12 +340,8 @@ export default function Home() {
                   <TabsTrigger value="products">
                     Products ({state?.final_products?.length ?? 0})
                   </TabsTrigger>
-                  <TabsTrigger value="ideas">
-                    Ideas ({state?.ideas?.length ?? 0})
-                  </TabsTrigger>
-                  <TabsTrigger value="risk">
-                    Risk ({state?.risk?.length ?? 0})
-                  </TabsTrigger>
+                  <TabsTrigger value="ideas">Ideas ({state?.ideas?.length ?? 0})</TabsTrigger>
+                  <TabsTrigger value="risk">Risk ({state?.risk?.length ?? 0})</TabsTrigger>
                   <TabsTrigger value="shopify">Shopify</TabsTrigger>
                 </TabsList>
 
@@ -262,10 +358,9 @@ export default function Home() {
                         <CardContent className="space-y-3">
                           <div className="aspect-square w-full overflow-hidden rounded-xl border bg-muted/30">
                             {p.image_data_url ? (
-                              // data url or placeholder url
                               // eslint-disable-next-line @next/next/no-img-element
                               <img
-                                src={p.image_data_url}
+                                src={`/api/proxy${p.image_data_url}`}
                                 alt={p.title}
                                 className="h-full w-full object-cover"
                               />
@@ -284,11 +379,6 @@ export default function Home() {
                                 {t}
                               </Badge>
                             ))}
-                          </div>
-
-                          <div className="rounded-xl border bg-muted/30 p-3">
-                            <p className="text-xs text-muted-foreground">Image prompt</p>
-                            <p className="text-sm">{p.image_prompt}</p>
                           </div>
                         </CardContent>
                       </Card>
@@ -345,9 +435,7 @@ export default function Home() {
                               {f}
                             </Badge>
                           ))}
-                          {(r.flags?.length ?? 0) === 0 && (
-                            <Badge variant="secondary">no flags</Badge>
-                          )}
+                          {(r.flags?.length ?? 0) === 0 && <Badge variant="secondary">no flags</Badge>}
                         </div>
                       </div>
                     ))}
