@@ -1,5 +1,48 @@
-.env*
-services/.env
-/services/node_modules
-/node_modules       
-/services/venv/Lib
+# General
+.DS_Store
+Thumbs.db
+*.log
+
+# Python / Backend
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.pytest_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Node / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnp*
+
+# Remix
+.cache/
+public/build/
+.env/*
+
+# TypeScript
+*.tsbuildinfo
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project Specific
+prophet/frontend/build/
+prophet/frontend/public/build/
