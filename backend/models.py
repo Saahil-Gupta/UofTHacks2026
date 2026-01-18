@@ -56,5 +56,4 @@ class GraphState(BaseModel):
     risk: List[RiskScore] = Field(default_factory=list)
     final_products: List[FinalProduct] = Field(default_factory=list)
 
-    shopify_result: Dict[str, Any] = Field(default_factory=dict)
     log: List[str] = Field(default_factory=list)

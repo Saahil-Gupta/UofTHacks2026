@@ -1,50 +1,46 @@
-from __future__ import annotations
-
-import os
 import requests
-from typing import Any, Dict, List
+import json
+import os
+from dotenv import load_dotenv
 
-def create_products(products: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """
-    If Shopify env vars are missing, returns a mock result so your demo still runs.
-    """
-    domain = os.getenv("SHOPIFY_STORE_DOMAIN")
-    token = os.getenv("SHOPIFY_ADMIN_TOKEN")
-    version = os.getenv("SHOPIFY_API_VERSION", "2024-10")
+from typing import List
+from backend.models import FinalProduct
 
-    if not domain or not token:
-        return {
-            "mode": "mock",
-            "created": [{"title": p["title"], "price": p["price"]} for p in products],
-            "errors": [],
+load_dotenv()  # Load environment variables from .env
+
+SHOP = "my-store-300000000000000003892.myshopify.com"
+ACCESS_TOKEN = os.getenv("SHOPIFY_ACCESS_TOKEN")  # or set env var
+url = f"https://{SHOP}/admin/api/2026-01/graphql.json"
+
+print(ACCESS_TOKEN)
+
+headers = {
+    "Content-Type": "application/json",
+    "X-Shopify-Access-Token": ACCESS_TOKEN,
+}
+
+query = """mutation CreateProductWithNewMedia($product: ProductCreateInput!, $media: [CreateMediaInput!]) {
+  productCreate(product: $product, media: $media) {
+    product { id title media(first: 10) { nodes { alt mediaContentType preview { status } } } }
+    userErrors { field message }
+  }
+}"""
+
+def create_products(final_products: List[FinalProduct]):
+    for product in final_products:
+        variables = {
+            "product": {"title": product.title},
+            "media": [
+                {
+                    "originalSource": product.image_data_url,
+                    "alt": product.title,
+                    "mediaContentType": "IMAGE",
+                },
+            ],
         }
 
-    # Minimal REST product create for demo
-    url = f"https://{domain}/admin/api/{version}/products.json"
-    headers = {
-        "X-Shopify-Access-Token": token,
-        "Content-Type": "application/json",
-    }
+        payload = {"query": query, "variables": variables}
 
-    created = []
-    errors = []
-
-    for p in products:
-        payload = {
-            "product": {
-                "title": p["title"],
-                "body_html": p["description"],
-                "tags": ", ".join(p.get("tags", [])),
-                "variants": [{"price": str(p["price"])}],
-            }
-        }
-        try:
-            r = requests.post(url, headers=headers, json=payload, timeout=20)
-            if r.status_code >= 300:
-                errors.append({"title": p["title"], "status": r.status_code, "body": r.text})
-            else:
-                created.append(r.json().get("product"))
-        except Exception as e:
-            errors.append({"title": p["title"], "error": str(e)})
-
-    return {"mode": "real", "created": created, "errors": errors}
+        resp = requests.post(url, headers=headers, json=payload, timeout=30)
+        resp.raise_for_status()
+        print(json.dumps(resp.json(), indent=2))

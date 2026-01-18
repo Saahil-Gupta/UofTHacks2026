@@ -140,11 +140,9 @@ def node_images(state: GraphState) -> Dict[str, Any]:
     return {"final_products": updated, "log": state.log + [msg]}
 
 
-def node_shopify(state: GraphState) -> Dict[str, Any]:
-    payload = [p.model_dump() for p in state.final_products]
-    result = create_products(payload)
-    msg = f"[SHOPIFY] mode={result.get('mode')} created={len(result.get('created', []))} errors={len(result.get('errors', []))}"
-    return {"shopify_result": result, "log": state.log + [msg]}
+def node_shopify(state: GraphState) -> None:
+    create_products(state.final_products)
+    return
 
 def node_stop(state: GraphState) -> Dict[str, Any]:
     return {"log": state.log + ["[STOP] ended early"]}
@@ -153,9 +151,9 @@ def build_graph():
     g = StateGraph(GraphState)
 
     g.add_node("prefilter", node_prefilter)
-    g.add_node("oracle", node_oracle_shoppable)
-    g.add_node("ideas", node_ideas)
-    g.add_node("risk", node_risk)
+    g.add_node("oracle_node", node_oracle_shoppable)
+    g.add_node("ideas_node", node_ideas)
+    g.add_node("risk_node", node_risk)
     g.add_node("products", node_build_products)
     g.add_node("images", node_images)
     g.add_node("shopify", node_shopify)
@@ -163,11 +161,11 @@ def build_graph():
 
     g.set_entry_point("prefilter")
 
-    g.add_conditional_edges("prefilter", route_after_prefilter, {"oracle": "oracle", "stop": "stop"})
-    g.add_conditional_edges("oracle", route_after_oracle, {"ideas": "ideas", "stop": "stop"})
+    g.add_conditional_edges("prefilter", route_after_prefilter, {"oracle": "oracle_node", "stop": "stop"})
+    g.add_conditional_edges("oracle_node", route_after_oracle, {"ideas": "ideas_node", "stop": "stop"})
 
-    g.add_edge("ideas", "risk")
-    g.add_edge("risk", "products")
+    g.add_edge("ideas_node", "risk_node")
+    g.add_edge("risk_node", "products")
     g.add_edge("products", "images")
     g.add_edge("images", "shopify")
     g.add_edge("shopify", END)

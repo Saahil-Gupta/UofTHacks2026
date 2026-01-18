@@ -3,59 +3,80 @@ from __future__ import annotations
 import os
 import json
 from typing import Any, Dict, Optional
-from openai import OpenAI
+import requests
 import base64
 import uuid
 from pathlib import Path
 
-def _client() -> OpenAI:
+def _base_headers() -> Dict[str, str]:
     api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
         raise RuntimeError("Missing OPENROUTER_API_KEY")
 
-    return OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=api_key,
-        default_headers={
-            "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "http://localhost:3000"),
-            "X-Title": os.getenv("OPENROUTER_APP_NAME", "Prophet-UofTHacks2026"),
-        },
-    )
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": os.getenv("OPENROUTER_SITE_URL", "http://localhost:3000"),
+        "X-Title": os.getenv("OPENROUTER_APP_NAME", "Prophet-UofTHacks2026"),
+    }
+    return headers
 
 def call_json(model: str, system: str, user: str) -> Dict[str, Any]:
     """
     Uses OpenRouter via OpenAI-compatible chat completions. :contentReference[oaicite:2]{index=2}
     """
-    client = _client()
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[
+    base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+    url = f"{base_url}/chat/completions"
+    headers = _base_headers()
+    payload = {
+        "model": model,
+        "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
         ],
-        response_format={"type": "json_object"},
-        temperature=0.2,
-    )
-    content = resp.choices[0].message.content or "{}"
+        "response_format": {"type": "json_object"},
+        "temperature": 0.2,
+    }
+
+    r = requests.post(url, headers=headers, json=payload, timeout=60)
+    r.raise_for_status()
+    resp = r.json()
+    # choices[0].message.content expected to be a JSON string
+    content = resp.get("choices", [])[0].get("message", {}).get("content") or "{}"
     return json.loads(content)
 
 def call_image_data_url(model: str, prompt: str) -> str:
-    client = _client()
+    base_url = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+    url = f"{base_url}/chat/completions"
+    headers = _base_headers()
+    payload = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        # ask for image modality
+        "modalities": ["image", "text"],
+    }
 
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "user", "content": prompt}],
-        extra_body={"modalities": ["image", "text"]},
-    )
+    r = requests.post(url, headers=headers, json=payload, timeout=120)
+    r.raise_for_status()
+    resp = r.json()
 
-    msg = resp.choices[0].message
-    images = getattr(msg, "images", None)
+    choice = resp.get("choices", [])[0]
+    msg = choice.get("message", {})
+    images = msg.get("images") or msg.get("content", {}).get("images")
     if not images:
         raise RuntimeError("No images returned. Model may not support image output.")
 
-    # OpenRouter returns dict-like objects here
     first = images[0]
-    return first["image_url"]["url"]
+    # support either nested dict or direct url
+    if isinstance(first, dict):
+        # OpenRouter returns {'image_url': {'url': '...'}} sometimes
+        if "image_url" in first:
+            return first["image_url"].get("url")
+        # or {'url': '...'}
+        return first.get("url")
+
+    # if string, return directly
+    return str(first)
 
 def save_data_url(data_url: str, out_dir: str | Path) -> str:
     """
