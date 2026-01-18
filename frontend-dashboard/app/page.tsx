@@ -78,6 +78,9 @@ const SAMPLE_MARKETS = [
   { id: "m1", label: "m1" },
   { id: "m2", label: "m2" },
   { id: "m3", label: "m3" },
+  { id: "m4", label: "m4" },
+  { id: "m5", label: "m5" },
+  { id: "m6", label: "m6" },
 ];
 
 type CacheEntry = {
@@ -751,7 +754,7 @@ export default function Home() {
             <CardContent>
               {/* STEP 4–6: render filtered + grouped logs, use termEndRef */}
               <ScrollArea className="h-90 rounded-xl border bg-black/40 p-3">
-                <div className={`space-y-1 font-mono text-xs ${termWrap ? "whitespace-pre-wrap break-words" : "whitespace-pre"}`}>
+                <div className={`space-y-1 font-mono text-xs ${termWrap ? "whitespace-pre-wrap wrap-break-word" : "whitespace-pre"}`}>
                   {!termGroup ? (
                     <>
                       {filteredTerminalLines.map((line, idx) => (
@@ -832,7 +835,7 @@ export default function Home() {
                           </CardHeader>
 
                           <CardContent className="space-y-3">
-                            <div className="aspect-square w-full overflow-hidden rounded-xl border bg-muted/30">
+                            {/* <div className="aspect-square w-full overflow-hidden rounded-xl border bg-muted/30">
                               {(() => {
                                 const shopifyImg = shopifyImageByTitle.get(p.title);
                                 const hasCreatedInShopify = (state?.shopify_result?.created?.length ?? 0) > 0;
@@ -842,7 +845,7 @@ export default function Home() {
                                   (!hasCreatedInShopify && p.image_data_url ? `/api/proxy${p.image_data_url}` : null);
 
                                 return imgSrc ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
+                                  // eslint-disable-next-line @next/next/no-img-element 
                                   <img
                                     src={imgSrc}
                                     alt={shopifyImg?.alt ?? p.title}
@@ -856,7 +859,7 @@ export default function Home() {
                                   </div>
                                 );
                               })()}
-                            </div>
+                            </div> */}
 
 
                             <p className="text-sm text-muted-foreground">{p.description}</p>

@@ -29,7 +29,7 @@ def node_oracle_shoppable(state: GraphState) -> Dict[str, Any]:
         "that are safe, non-sensitive, and sellable within 24 to 72 hours. "
         "Return JSON only with: shoppable (bool), reason (string), category (string). "
         "If sports, entertainment, or holiday event, set shoppable=true. "
-        "If medical claims, violence, hate, or real-person likeness, set shoppable=false."
+        "If crypto, medical claims, violence, hate, or real-person likeness, set shoppable=false."
     )
     user = f"""
 Market name: {state.market.market_name}
@@ -117,7 +117,7 @@ Return JSON only.
     return {"final_products": products, "log": state.log + [msg]}
 
 def node_images(state: GraphState) -> Dict[str, Any]:
-    image_model = os.getenv("OR_IMAGE_MODEL", "black-forest-labs/flux.2-klein-4b")
+    image_model = os.getenv("OR_IMAGE_MODEL", "google/gemini-3-pro-image-preview")
 
     # same dir as app.py uses
     out_dir = Path(__file__).resolve().parents[1] / "generated"  # project-root/generated

@@ -11,7 +11,6 @@ from backend.graph import build_graph
 from backend.models import GraphState, Market
 from backend.polymarket import get_mock_markets
 from backend.routes.debug_shopify import router as debug_shopify_router
-from backend.routes.shopify_products import router as shopify_products_router
 
 load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
@@ -19,12 +18,12 @@ app = FastAPI(title="Prophet Agents", version="0.1.0")
 
 
 # ---- NEW: serve generated images
-GENERATED_DIR = Path(__file__).with_name("generated")
-GENERATED_DIR.mkdir(exist_ok=True)
+PROJECT_ROOT = Path(__file__).resolve().parent  # folder containing this app.py
+GENERATED_DIR = PROJECT_ROOT / "generated"
+GENERATED_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/generated", StaticFiles(directory=str(GENERATED_DIR)), name="generated")
 # -------------------------------
 app.include_router(debug_shopify_router)
-app.include_router(shopify_products_router)
 graph = build_graph()
 
 @app.get("/")

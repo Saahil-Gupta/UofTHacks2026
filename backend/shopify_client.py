@@ -50,110 +50,75 @@ def _graphql(query: str, variables: Dict[str, Any] | None = None) -> Dict[str, A
 
 PRODUCT_CREATE = """
 mutation productCreate($product: ProductCreateInput!) {
-  productCreate(product: $product) {
-    product {
-      id
-      title
-      variants(first: 1) {
-        edges {
-          node {
-            id
-          }
+    productCreate(product: $product) {
+        product {
+        id
+        title
+        variants(first: 1) {
+            edges {
+            node {
+                id
+            }
+            }
         }
-      }
+        }
+        userErrors {
+        field
+        message
+        }
     }
-    userErrors {
-      field
-      message
-    }
-  }
 }
 """
 
 VARIANTS_BULK_UPDATE = """
 mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-  productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-    product { id }
-    productVariants { id }
-    userErrors { field message }
-  }
+    productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+        product { id }
+        productVariants { id }
+        userErrors { field message }
+    }
 }
 """
 
 PUBLISH_TO_CURRENT_CHANNEL = """
 mutation publishablePublishToCurrentChannel($id: ID!) {
-  publishablePublishToCurrentChannel(id: $id) {
-    userErrors { field message }
-  }
+    publishablePublishToCurrentChannel(id: $id) {
+        userErrors { field message }
+    }
 }
 """
 
 STAGED_UPLOADS_CREATE = """
 mutation stagedUploadsCreate($input: [StagedUploadInput!]!) {
-  stagedUploadsCreate(input: $input) {
-    stagedTargets {
-      url
-      resourceUrl
-      parameters { name value }
+    stagedUploadsCreate(input: $input) {
+        stagedTargets {
+        url
+        resourceUrl
+        parameters { name value }
+        }
+        userErrors { field message }
     }
-    userErrors { field message }
-  }
 }
 """
 
 PRODUCT_UPDATE_ADD_MEDIA = """
 mutation productUpdate($product: ProductUpdateInput!, $media: [CreateMediaInput!]) {
-  productUpdate(product: $product, media: $media) {
-    product {
-      id
-      media(first: 1) {
-        nodes {
-          alt
-          mediaContentType
-          ... on MediaImage {
-            image { url }
-          }
-        }
-      }
-    }
-    userErrors { field message }
-  }
-}
-"""
-
-PRODUCTS_LIST = """
-query Products($first: Int!) {
-  products(first: $first) {
-    edges {
-      node {
+    productUpdate(product: $product, media: $media) {
+        product {
         id
-        title
-        handle
-        featuredImage {
-          url
-          altText
+        media(first: 10) {
+            nodes {
+            alt
+            mediaContentType
+            preview { status }
+            }
         }
-      }
+        }
+        userErrors { field message }
     }
-  }
 }
 """
 
-def list_products(limit: int = 20) -> dict:
-    data = _graphql(PRODUCTS_LIST, {"first": limit})
-    edges = (data.get("products") or {}).get("edges") or []
-    items = []
-    for e in edges:
-        n = e.get("node") or {}
-        img = n.get("featuredImage") or {}
-        items.append({
-            "id": n.get("id"),
-            "title": n.get("title"),
-            "handle": n.get("handle"),
-            "imageUrl": img.get("url"),
-            "imageAlt": img.get("altText"),
-        })
-    return {"products": items}
 
 def _project_root() -> Path:
     # backend/shopify_client.py -> backend -> project root
@@ -303,16 +268,6 @@ def create_products(products: List[Dict[str, Any]]) -> Dict[str, Any]:
                 local_path = _resolve_local_image_path(image_data_url)
                 if local_path:
                     media_result = _attach_image_to_product(product_id, local_path, alt=title)
-                    image_url = None
-                    image_alt = None
-                    try:
-                        nodes = (((media_result.get("product") or {}).get("media") or {}).get("nodes")) or []
-                        if nodes:
-                            image_alt = nodes[0].get("alt")
-                            img = nodes[0].get("image") or {}
-                            image_url = img.get("url")
-                    except Exception:
-                        pass
             except Exception as e:
                 media_error = str(e)
 
@@ -334,8 +289,6 @@ def create_products(products: List[Dict[str, Any]]) -> Dict[str, Any]:
                     "mediaAttached": bool(media_result),
                     "mediaError": media_error,
                     "publishErrors": publish_errors,
-                    "imageUrl": image_url,
-                    "imageAlt": image_alt,
                 }
             )
 
