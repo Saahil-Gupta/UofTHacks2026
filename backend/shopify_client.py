@@ -106,11 +106,13 @@ mutation productUpdate($product: ProductUpdateInput!, $media: [CreateMediaInput!
   productUpdate(product: $product, media: $media) {
     product {
       id
-      media(first: 10) {
+      media(first: 1) {
         nodes {
           alt
           mediaContentType
-          preview { status }
+          ... on MediaImage {
+            image { url }
+          }
         }
       }
     }
@@ -119,6 +121,39 @@ mutation productUpdate($product: ProductUpdateInput!, $media: [CreateMediaInput!
 }
 """
 
+PRODUCTS_LIST = """
+query Products($first: Int!) {
+  products(first: $first) {
+    edges {
+      node {
+        id
+        title
+        handle
+        featuredImage {
+          url
+          altText
+        }
+      }
+    }
+  }
+}
+"""
+
+def list_products(limit: int = 20) -> dict:
+    data = _graphql(PRODUCTS_LIST, {"first": limit})
+    edges = (data.get("products") or {}).get("edges") or []
+    items = []
+    for e in edges:
+        n = e.get("node") or {}
+        img = n.get("featuredImage") or {}
+        items.append({
+            "id": n.get("id"),
+            "title": n.get("title"),
+            "handle": n.get("handle"),
+            "imageUrl": img.get("url"),
+            "imageAlt": img.get("altText"),
+        })
+    return {"products": items}
 
 def _project_root() -> Path:
     # backend/shopify_client.py -> backend -> project root
@@ -268,6 +303,16 @@ def create_products(products: List[Dict[str, Any]]) -> Dict[str, Any]:
                 local_path = _resolve_local_image_path(image_data_url)
                 if local_path:
                     media_result = _attach_image_to_product(product_id, local_path, alt=title)
+                    image_url = None
+                    image_alt = None
+                    try:
+                        nodes = (((media_result.get("product") or {}).get("media") or {}).get("nodes")) or []
+                        if nodes:
+                            image_alt = nodes[0].get("alt")
+                            img = nodes[0].get("image") or {}
+                            image_url = img.get("url")
+                    except Exception:
+                        pass
             except Exception as e:
                 media_error = str(e)
 
@@ -289,6 +334,8 @@ def create_products(products: List[Dict[str, Any]]) -> Dict[str, Any]:
                     "mediaAttached": bool(media_result),
                     "mediaError": media_error,
                     "publishErrors": publish_errors,
+                    "imageUrl": image_url,
+                    "imageAlt": image_alt,
                 }
             )
 

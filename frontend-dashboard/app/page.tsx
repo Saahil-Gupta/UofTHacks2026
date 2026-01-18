@@ -61,7 +61,14 @@ type GraphState = {
   }>;
   shopify_result?: {
     mode?: string;
-    created?: any[];
+    created?: Array<{
+      title: string;
+      productId: string;
+      variantId: string;
+      price: string;
+      imageUrl?: string;
+      imageAlt?: string;
+      }>;
     errors?: any[];
   };
   log: string[];
@@ -407,6 +414,14 @@ export default function Home() {
     return m;
   }, [state?.risk]);
 
+  const shopifyImageByTitle = useMemo(() => {
+    const m = new Map<string, { url?: string; alt?: string }>();
+    (state?.shopify_result?.created ?? []).forEach((c) => {
+      m.set(c.title, { url: c.imageUrl, alt: c.imageAlt });
+    });
+    return m;
+  }, [state?.shopify_result?.created]);
+
   const currentStatus = statusFor(state);
   const pill = statusPill(currentStatus);
 
@@ -496,8 +511,12 @@ export default function Home() {
       <div className="mx-auto max-w-7xl px-6 py-6">
         <header className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-emerald-500/15 ring-1 ring-emerald-500/30 flex items-center justify-center">
-              <span className="text-emerald-300 font-semibold">P</span>
+            <div className="h-10 w-10 rounded-xl bg-emerald-500/15 ring-1 ring-emerald-500/30 flex items-center justify-center overflow-hidden">
+              <img
+                src="/prophet-1.png"
+                alt="Prophet"
+                className="h-full w-full object-contain"
+              />
             </div>
             <div>
               <h1 className="text-xl font-semibold leading-tight">Prophet</h1>
@@ -814,20 +833,31 @@ export default function Home() {
 
                           <CardContent className="space-y-3">
                             <div className="aspect-square w-full overflow-hidden rounded-xl border bg-muted/30">
-                              {p.image_data_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={`/api/proxy${p.image_data_url}`}
-                                  alt={p.title}
-                                  className="h-full w-full object-cover"
-                                  loading="lazy"
-                                />
-                              ) : (
-                                <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                                  no image yet
-                                </div>
-                              )}
+                              {(() => {
+                                const shopifyImg = shopifyImageByTitle.get(p.title);
+                                const hasCreatedInShopify = (state?.shopify_result?.created?.length ?? 0) > 0;
+
+                                const imgSrc =
+                                  shopifyImg?.url ??
+                                  (!hasCreatedInShopify && p.image_data_url ? `/api/proxy${p.image_data_url}` : null);
+
+                                return imgSrc ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={imgSrc}
+                                    alt={shopifyImg?.alt ?? p.title}
+                                    className="h-full w-full object-cover"
+                                    loading="lazy"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                ) : (
+                                  <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+                                    no image yet
+                                  </div>
+                                );
+                              })()}
                             </div>
+
 
                             <p className="text-sm text-muted-foreground">{p.description}</p>
 
@@ -929,9 +959,6 @@ export default function Home() {
           </Card>
         </div>
 
-        <footer className="mt-10 text-xs text-muted-foreground">
-          Tip: open FastAPI docs at <span className="text-emerald-300">/docs</span> and run markets here for the demo.
-        </footer>
       </div>
     </div>
   );
